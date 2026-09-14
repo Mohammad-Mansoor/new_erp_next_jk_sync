@@ -137,8 +137,22 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
+doc_events = {
+	"Customer": {
+		"before_rename": "jk_sync.sync.master_data.customer_before_rename"
+	},
+	"Stock Ledger Entry": {
+		"after_insert": "jk_sync.sync.stock.log_stock_ledger_entry"
+	}
+}
+
+scheduler_events = {
+	"cron": {
+		"* * * * *": [
+			"jk_sync.sync.outbox.process_outbox"
+		]
+	}
+}
 # 		"on_update": "method",
 # 		"on_cancel": "method",
 # 		"on_trash": "method"

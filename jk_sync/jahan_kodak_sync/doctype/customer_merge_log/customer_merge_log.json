@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-14 20:34:32.531652",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "old_customer_uuid",
+  "new_customer_uuid",
+  "merged_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "CML-"
+  },
+  {
+   "fieldname": "old_customer_uuid",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Old Customer UUID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "new_customer_uuid",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "New Customer UUID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "merged_at",
+   "fieldtype": "Datetime",
+   "label": "Merged At"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-14 20:34:32.531652",
+ "modified_by": "Administrator",
+ "module": "Jahan Kodak Sync",
+ "name": "Customer Merge Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
