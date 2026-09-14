@@ -40,13 +40,13 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "PROCESSED\nFAILED"
+   "options": "PROCESSING\nPROCESSED\nFAILED"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-14 20:34:32.335776",
+ "modified": "2026-09-14 21:56:10.972417",
  "modified_by": "Administrator",
  "module": "Jahan Kodak Sync",
  "name": "Branch Sync Inbox",

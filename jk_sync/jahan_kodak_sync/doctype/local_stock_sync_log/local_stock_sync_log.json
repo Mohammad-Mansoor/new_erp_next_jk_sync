@@ -1,0 +1,103 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:stock_delta_id",
+ "creation": "2026-09-14 21:58:17.840505",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stock_delta_id",
+  "status",
+  "claim_token",
+  "locked_at",
+  "item_code",
+  "warehouse",
+  "qty_change",
+  "sequence_no"
+ ],
+ "fields": [
+  {
+   "fieldname": "stock_delta_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Stock Delta ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "PROCESSING",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "PROCESSING\nPROCESSED\nFAILED"
+  },
+  {
+   "fieldname": "claim_token",
+   "fieldtype": "Data",
+   "label": "Claim Token"
+  },
+  {
+   "fieldname": "locked_at",
+   "fieldtype": "Datetime",
+   "label": "Locked At"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty_change",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Quantity Change",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sequence_no",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sequence No"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-14 21:58:17.840505",
+ "modified_by": "Administrator",
+ "module": "Jahan Kodak Sync",
+ "name": "Local Stock Sync Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

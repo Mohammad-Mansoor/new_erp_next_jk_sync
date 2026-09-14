@@ -3,11 +3,13 @@ import hmac
 import hashlib
 import time
 import json
+import uuid
 
 @frappe.whitelist(allow_guest=True)
 def receive_sync_event():
     """
     Cloud endpoint to receive outbox events from branches.
+    Implements a strict Atomic Insert Barrier to prevent concurrent execution.
     """
     try:
         # 1. Read headers
@@ -68,20 +70,68 @@ def receive_sync_event():
             frappe.local.response['http_status_code'] = 403
             return {"status": "PERMANENT_FAILED", "message": f"User {owner} is not authorized for branch {branch_id}."}
             
-        # 6. Inbox Idempotency & Integrity Check
+        # 6. Inbox Idempotency - ATOMIC INSERT BARRIER
         payload_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest()
+        claim_token = str(uuid.uuid4())
         
-        existing_inbox = frappe.db.get_value("Branch Sync Inbox", event_id, ["status", "payload_hash"], as_dict=True)
-        if existing_inbox:
-            if existing_inbox.payload_hash == payload_hash:
-                return {"status": "DUPLICATE_ACK", "message": "Already processed successfully."}
-            else:
+        try:
+            frappe.db.sql("""
+                INSERT INTO `tabBranch Sync Inbox`
+                (name, event_id, payload_hash, branch_id, status, claim_token, locked_at, creation, modified)
+                VALUES (%s, %s, %s, %s, 'PROCESSING', %s, NOW(), NOW(), NOW())
+            """, (event_id, event_id, payload_hash, branch_id, claim_token))
+            frappe.db.commit() # Commit the lock immediately
+        except Exception as e:
+            if "1062" not in str(e) and "Duplicate" not in str(e):
+                raise
+                
+            frappe.db.rollback() # Clear the failed insert state
+            
+            # Row exists. Let's acquire a row lock to inspect it safely.
+            existing = frappe.db.sql("""
+                SELECT status, payload_hash, locked_at
+                FROM `tabBranch Sync Inbox` 
+                WHERE event_id = %s 
+                FOR UPDATE
+            """, (event_id,), as_dict=True)
+            
+            if not existing:
+                return {"status": "RETRYABLE_FAILED", "message": "Concurrency anomaly."}
+                
+            existing_doc = existing[0]
+            
+            if existing_doc.payload_hash != payload_hash:
+                frappe.db.commit() # Release lock
                 return {"status": "PERMANENT_FAILED", "message": "EVENT_ID_REUSE_WITH_DIFFERENT_PAYLOAD"}
                 
+            if existing_doc.status == "PROCESSED":
+                frappe.db.commit() # Release lock
+                return {"status": "DUPLICATE_ACK", "message": "Already processed successfully."}
+                
+            if existing_doc.status == "PROCESSING":
+                # Is it an active claim or stale?
+                # Check if locked_at is older than 5 minutes
+                stale_threshold = frappe.db.sql("SELECT NOW() - INTERVAL 5 MINUTE")[0][0]
+                
+                if existing_doc.locked_at and existing_doc.locked_at > stale_threshold:
+                    # Active claim
+                    frappe.db.commit() # Release lock
+                    return {"status": "RETRYABLE_FAILED", "message": "Event is currently processing by another worker."}
+                else:
+                    # Stale claim. Reclaim it with our claim_token!
+                    frappe.db.sql("""
+                        UPDATE `tabBranch Sync Inbox`
+                        SET claim_token = %s, locked_at = NOW()
+                        WHERE event_id = %s
+                    """, (claim_token, event_id))
+                    frappe.db.commit() # We now own the lease!
+        
         # 7. Business Processing
         frappe.set_user(owner)
         
         try:
+            # We own the Inbox row via claim_token.
+            # Begin business transaction
             frappe.db.savepoint("sync_event_processing")
             
             if event_type == "POS Invoice":
@@ -94,35 +144,49 @@ def receive_sync_event():
                 from jk_sync.handlers.pos_closing import handle_pos_closing
                 handle_pos_closing(payload)
             else:
+                mark_inbox_failed(event_id, claim_token)
                 return {"status": "PERMANENT_FAILED", "message": f"Unsupported event_type: {event_type}"}
                 
-            # 8. Record in Inbox
-            inbox_doc = frappe.get_doc({
-                "doctype": "Branch Sync Inbox",
-                "event_id": event_id,
-                "payload_hash": payload_hash,
-                "branch_id": branch_id,
-                "status": "PROCESSED"
-            })
-            inbox_doc.insert(ignore_permissions=True)
+            # 8. Mark PROCESSED
+            affected = frappe.db.sql("""
+                UPDATE `tabBranch Sync Inbox`
+                SET status = 'PROCESSED'
+                WHERE event_id = %s AND claim_token = %s
+            """, (event_id, claim_token))
+            
+            if affected == 0:
+                # Fencing token failed! Another worker stole our lease because we took too long.
+                frappe.db.rollback(save_point="sync_event_processing")
+                return {"status": "RETRYABLE_FAILED", "message": "Lost lease during execution."}
             
             frappe.db.commit()
             return {"status": "PROCESSED", "message": "Success"}
             
         except frappe.exceptions.LinkValidationError as e:
             frappe.db.rollback(save_point="sync_event_processing")
+            mark_inbox_failed(event_id, claim_token) # For retryable we could just release lease, but marking FAILED is ok too. Actually, if we release the lease, the branch can retry immediately.
             return {"status": "RETRYABLE_FAILED", "message": f"Missing Dependency: {str(e)}"}
         except frappe.exceptions.DoesNotExistError as e:
             frappe.db.rollback(save_point="sync_event_processing")
             return {"status": "RETRYABLE_FAILED", "message": f"Missing Record: {str(e)}"}
         except frappe.exceptions.DuplicateEntryError as e:
             frappe.db.rollback(save_point="sync_event_processing")
+            mark_inbox_failed(event_id, claim_token)
             return {"status": "PERMANENT_FAILED", "message": f"Business Identity Collision: {str(e)}"}
         except Exception as e:
             frappe.db.rollback(save_point="sync_event_processing")
             frappe.log_error(frappe.get_traceback(), f"Sync Error: {event_id}")
+            mark_inbox_failed(event_id, claim_token)
             return {"status": "PERMANENT_FAILED", "message": str(e)}
             
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Sync Receiver Fatal Error")
         return {"status": "RETRYABLE_FAILED", "message": "Internal Server Error"}
+
+def mark_inbox_failed(event_id, claim_token):
+    frappe.db.sql("""
+        UPDATE `tabBranch Sync Inbox`
+        SET status = 'FAILED'
+        WHERE event_id = %s AND claim_token = %s
+    """, (event_id, claim_token))
+    frappe.db.commit()

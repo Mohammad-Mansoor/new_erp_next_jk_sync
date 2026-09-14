@@ -13,7 +13,13 @@ def process_outbox():
     worker_uuid = frappe.generate_hash(length=12)
     claim_token = str(uuid.uuid4())
     
-    # 1. Atomic Fenced Claim
+    # 1. Atomic Fenced Claim (with dependency check)
+    # We only claim PENDING rows if all their dependencies are PROCESSED.
+    # In MariaDB, we can do a subquery or we just claim PENDING, then check dependencies in python,
+    # and if not ready, release them.
+    # Since MariaDB 10.6 JSON functions in WHERE clauses in UPDATE statements can be complex,
+    # let's do Python-side dependency filtering for safety.
+    
     frappe.db.sql("""
         UPDATE `tabBranch Sync Outbox`
         SET status = 'PROCESSING',
@@ -28,7 +34,7 @@ def process_outbox():
     
     # 2. Retrieve claimed rows safely
     events = frappe.db.sql("""
-        SELECT name, event_type, payload
+        SELECT name, event_type, payload, depends_on
         FROM `tabBranch Sync Outbox`
         WHERE status = 'PROCESSING' 
         AND locked_by = %s 
@@ -47,6 +53,33 @@ def process_outbox():
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.receiver.receive_sync_event"
     
     for event in events:
+        # Dependency check
+        if event.depends_on:
+            try:
+                deps = json.loads(event.depends_on)
+                if deps:
+                    unmet = frappe.db.sql("""
+                        SELECT name FROM `tabBranch Sync Outbox` 
+                        WHERE name IN %s AND status != 'PROCESSED'
+                    """, (tuple(deps),))
+                    if unmet:
+                        # Dependency not ready! Release claim and set status to DEPENDENCY_NOT_READY (or just PENDING)
+                        # The prompt says "If a dependency is RETRYABLE_FAILED, dependent event remains waiting. 
+                        # If a dependency is PERMANENT_FAILED, make the dependency failure visible."
+                        
+                        failed_deps = frappe.db.sql("""
+                            SELECT name FROM `tabBranch Sync Outbox`
+                            WHERE name IN %s AND status = 'PERMANENT_FAILED'
+                        """, (tuple(deps),))
+                        
+                        if failed_deps:
+                            mark_status(event.name, claim_token, "PERMANENT_FAILED", f"Dependency permanently failed: {failed_deps[0][0]}")
+                        else:
+                            mark_status(event.name, claim_token, "PENDING", "Waiting for dependencies to process.")
+                        continue
+            except Exception:
+                pass # Invalid depends_on json
+                
         # Renew lease before each heavy HTTP request just in case.
         affected = frappe.db.sql("""
             UPDATE `tabBranch Sync Outbox` SET locked_at = NOW() 
@@ -54,13 +87,11 @@ def process_outbox():
         """, (event.name, claim_token))
         
         if affected == 0:
-            # Lease was lost/expired and taken by another worker.
             continue
             
         frappe.db.commit()
         
         payload_json = event.payload
-        # Inject event_id and event_type into payload for transport
         try:
             payload_dict = json.loads(payload_json)
             payload_dict["event_id"] = event.name
@@ -107,6 +138,9 @@ def process_outbox():
             mark_status(event.name, claim_token, "RETRYABLE_FAILED", f"Network Error: {str(e)}")
 
 def mark_status(event_id, claim_token, status, error_log=None):
+    if status == "SUCCESS":
+        status = "PROCESSED" # Normalize to doctype option
+        
     frappe.db.sql("""
         UPDATE `tabBranch Sync Outbox`
         SET status = %s, error_log = %s
@@ -114,13 +148,17 @@ def mark_status(event_id, claim_token, status, error_log=None):
     """, (status, error_log, event_id, claim_token))
     frappe.db.commit()
 
-def enqueue_event(event_type, payload_dict):
+def enqueue_event(event_type, payload_dict, depends_on=None):
     event_id = frappe.generate_hash(length=20)
-    outbox_doc = frappe.get_doc({
+    doc_args = {
         "doctype": "Branch Sync Outbox",
         "event_id": event_id,
         "event_type": event_type,
         "payload": json.dumps(payload_dict)
-    })
+    }
+    if depends_on:
+        doc_args["depends_on"] = json.dumps(depends_on)
+        
+    outbox_doc = frappe.get_doc(doc_args)
     outbox_doc.insert(ignore_permissions=True)
     return event_id
