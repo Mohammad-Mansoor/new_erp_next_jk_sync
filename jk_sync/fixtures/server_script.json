@@ -1,0 +1,40 @@
+[
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 1,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Insert",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-07-18 17:57:29.399550",
+  "module": null,
+  "name": "Generate SKU for Item",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "Item",
+  "script": "\nif doc.has_variants == 0 and doc.variant_of:\n    template = frappe.get_doc(\"Item\", doc.variant_of)\n    group = frappe.db.get_value(\"Item Group\", template.item_group, \"name\")[:3].upper() if template.item_group else \"ITM\"\n    \n    attr_abbrs = []\n    if doc.get('attributes'):\n        for attr in doc.attributes:\n            # We must fetch the custom field from the TEMPLATE's attributes, \n            # because Frappe does not copy custom child table fields to the variant memory!\n            is_included = False\n            for t_attr in template.attributes:\n                if t_attr.attribute == attr.attribute:\n                    is_included = t_attr.get(\"custom_include_in_sku\")\n                    break\n                    \n            if is_included:\n                val = frappe.db.get_value(\"Item Attribute Value\", {\"parent\": attr.attribute, \"attribute_value\": attr.attribute_value}, \"abbr\")\n                if not val:\n                    val = str(attr.attribute_value)[:3].upper() if attr.attribute_value else \"XXX\"\n                attr_abbrs.append(val)\n                \n    # Build Prefix\n    base_sku = f\"{group}-\" + \"-\".join(attr_abbrs) + \"-\" if attr_abbrs else f\"{group}-\"\n    \n    # Auto-Increment Logic (001, 002)\n    existing_items = frappe.db.get_all(\"Item\", filters={\"item_code\": (\"like\", base_sku + \"%\")}, fields=[\"item_code\"])\n    \n    max_num = 0\n    for item in existing_items:\n        code = item.item_code\n        if code.startswith(base_sku):\n            num_str = code[len(base_sku):]\n            if num_str.isdigit():\n                max_num = max(max_num, int(num_str))\n                \n    next_num = max_num + 1\n    sku = f\"{base_sku}{next_num:03d}\"\n    \n    # Set SKU and NAME\n    doc.item_code = sku\n    doc.item_name = doc.item_code\n    doc.name = sku\n    \n    # Auto-generate Barcode\n    barcode_exists = False\n    if doc.get(\"barcodes\"):\n        for b in doc.barcodes:\n            if b.barcode == doc.item_code:\n                barcode_exists = True\n                break\n                \n    if not barcode_exists:\n        doc.append(\"barcodes\", {\n            \"barcode\": doc.item_code\n        })\n",
+  "script_type": "DocType Event"
+ },
+ {
+  "allow_guest": 0,
+  "api_method": null,
+  "cron_format": null,
+  "disabled": 1,
+  "docstatus": 0,
+  "doctype": "Server Script",
+  "doctype_event": "Before Submit",
+  "enable_rate_limit": 0,
+  "event_frequency": "All",
+  "modified": "2026-08-31 00:48:31.711731",
+  "module": null,
+  "name": "Validate Stock Recon on POS Closing",
+  "rate_limit_count": 5,
+  "rate_limit_seconds": 86400,
+  "reference_doctype": "POS Closing Entry",
+  "script": "\nif not doc.custom_stock_reconciliation:\n    frappe.throw(\"A valid Stock Reconciliation document is required to close the POS shift.\")\nelse:\n    status = frappe.db.get_value(\"Stock Reconciliation\", doc.custom_stock_reconciliation, \"docstatus\")\n    if status != 1:\n        frappe.throw(\"The linked Stock Reconciliation (\" + str(doc.custom_stock_reconciliation) + \") must be submitted (docstatus=1) before closing the POS shift.\")\n",
+  "script_type": "DocType Event"
+ }
+]

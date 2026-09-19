@@ -10,7 +10,8 @@
   "api_key",
   "api_secret",
   "cloud_url",
-  "is_cloud"
+  "is_cloud",
+  "last_master_data_sync"
  ],
  "fields": [
   {
@@ -40,6 +41,12 @@
    "fieldname": "is_cloud",
    "fieldtype": "Check",
    "label": "Is Cloud Server"
+  },
+  {
+   "fieldname": "last_master_data_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Master Data Sync",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

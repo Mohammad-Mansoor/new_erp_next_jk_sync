@@ -55,7 +55,8 @@ def poll_master_data():
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.master.get_master_updates"
     
     timestamp = str(int(time.time()))
-    payload_json = json.dumps({"last_sync": "2020-01-01"}) # Simplified for POC
+    last_sync = config.last_master_data_sync or "2000-01-01 00:00:00"
+    payload_json = json.dumps({"last_master_data_sync": str(last_sync)})
     canonical = f"{config.branch_id}{timestamp}{payload_json}"
     signature = hmac.new(
         config.api_secret.encode('utf-8'),
@@ -161,6 +162,37 @@ def process_master_updates(data):
                 frappe.db.sql("UPDATE `tabLocal Stock Sync Log` SET status = 'FAILED' WHERE stock_delta_id = %s AND claim_token = %s", (stock_delta_id, claim_token))
                 frappe.db.commit()
                 frappe.log_error(frappe.get_traceback(), f"Failed to inject stock delta {stock_delta_id}")
+
+    # 3. Process Master Data
+    master_data = data.get("master_data", {})
+    master_doctypes = [
+        "Role", "Company", "Cost Center", "Account", "Warehouse", "UOM", 
+        "Item Group", "Customer Group", "Mode of Payment", "POS Payment Method",
+        "User", "Item", "Customer", "Item Price", "POS Profile"
+    ]
+    
+    frappe.flags.is_syncing = True
+    
+    for dt in master_doctypes:
+        docs = master_data.get(dt, [])
+        for doc_dict in docs:
+            doc_name = doc_dict.get("name")
+            try:
+                if frappe.db.exists(dt, doc_name):
+                    doc = frappe.get_doc(dt, doc_name)
+                    doc.update(doc_dict)
+                    doc.save(ignore_permissions=True)
+                else:
+                    doc = frappe.get_doc(doc_dict)
+                    doc.insert(set_name=True, ignore_permissions=True)
+            except Exception as e:
+                frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
+                
+    frappe.flags.is_syncing = False
+    
+    # Update last_sync timestamp if we processed any master data payload
+    if master_data:
+        frappe.db.set_value("Branch Sync Config", "Branch Sync Config", "last_master_data_sync", frappe.utils.now_datetime())
 
 def ack_stock_delta(stock_delta_id):
     """
