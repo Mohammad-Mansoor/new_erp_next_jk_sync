@@ -175,6 +175,10 @@ def process_master_updates(data):
     
     for dt in master_doctypes:
         docs = master_data.get(dt, [])
+        
+        if frappe.get_meta(dt).is_tree:
+            docs = sorted(docs, key=lambda x: x.get("lft") or 0)
+            
         for doc_dict in docs:
             doc_name = doc_dict.get("name")
             try:
