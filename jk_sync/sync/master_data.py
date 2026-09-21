@@ -181,12 +181,16 @@ def process_master_updates(data):
             
         for doc_dict in docs:
             doc_name = doc_dict.get("name")
+            
+            # Prevent Frappe ORM TimestampMismatch errors by removing cloud timestamps
+            doc_dict.pop("modified", None)
+            doc_dict.pop("_original_modified", None)
+            
             try:
                 if frappe.db.exists(dt, doc_name):
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
                     doc.flags.ignore_links = True
-                    doc.check_if_latest = lambda *args, **kwargs: None
                     doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
