@@ -181,10 +181,12 @@ def process_master_updates(data):
                 if frappe.db.exists(dt, doc_name):
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
-                    doc.save(ignore_permissions=True, ignore_links=True)
+                    doc.flags.ignore_links = True
+                    doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
-                    doc.insert(set_name=doc_name, ignore_permissions=True, ignore_links=True)
+                    doc.flags.ignore_links = True
+                    doc.insert(set_name=doc_name, ignore_permissions=True)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
                 
