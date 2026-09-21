@@ -182,6 +182,7 @@ def process_master_updates(data):
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
                     doc.flags.ignore_links = True
+                    doc.check_if_latest = lambda *args, **kwargs: None
                     doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
