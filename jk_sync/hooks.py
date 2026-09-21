@@ -158,7 +158,8 @@ doc_events = {
 scheduler_events = {
 	"cron": {
 		"* * * * *": [
-			"jk_sync.sync.outbox.process_outbox"
+			"jk_sync.sync.outbox.process_outbox",
+			"jk_sync.sync.master_data.poll_master_data"
 		]
 	}
 }
