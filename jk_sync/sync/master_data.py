@@ -184,7 +184,7 @@ def process_master_updates(data):
                     doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
-                    doc.insert(set_name=True, ignore_permissions=True)
+                    doc.insert(set_name=doc_name, ignore_permissions=True)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
                 
@@ -192,7 +192,11 @@ def process_master_updates(data):
     
     # Update last_sync timestamp if we processed any master data payload
     if master_data:
-        frappe.db.set_value("Branch Sync Config", "Branch Sync Config", "last_master_data_sync", frappe.utils.now_datetime())
+        safe_next_sync = data.get("next_sync_timestamp")
+        if not safe_next_sync:
+            safe_next_sync = frappe.utils.now_datetime()
+            
+        frappe.db.set_value("Branch Sync Config", "Branch Sync Config", "last_master_data_sync", safe_next_sync)
 
 def ack_stock_delta(stock_delta_id):
     """

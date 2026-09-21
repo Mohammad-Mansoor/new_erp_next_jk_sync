@@ -19,6 +19,9 @@ def get_master_updates():
     if not last_sync:
         last_sync = "2000-01-01 00:00:00"
 
+    current_sync_time = frappe.utils.now_datetime()
+    safe_next_sync = current_sync_time
+
     # Master DocTypes in dependency order
     master_doctypes = [
         "Role", "Company", "Cost Center", "Account", "Warehouse", "UOM", 
@@ -50,6 +53,15 @@ def get_master_updates():
             except Exception as e:
                 frappe.log_error(f"Error serializing {dt} {r.name}: {str(e)}", "Master Sync Expansion Error")
                 
+        if len(records) == 500:
+            # We hit the chunk limit for this doctype.
+            # The safe cursor to advance to globally is the modified time of this 500th record.
+            # If multiple doctypes hit the limit, we take the earliest (minimum) of their max timestamps
+            # to ensure NO records are ever skipped across multiple doctypes.
+            last_record_modified = records[-1].get("modified")
+            if last_record_modified and last_record_modified < safe_next_sync:
+                safe_next_sync = last_record_modified
+                
         if doc_list:
             master_data_payload[dt] = doc_list
             
@@ -65,6 +77,7 @@ def get_master_updates():
         
     return {
         "status": "SUCCESS",
+        "next_sync_timestamp": str(safe_next_sync),
         "stock_deltas": stock_logs,
         "customer_merges": [], 
         "master_data": master_data_payload
