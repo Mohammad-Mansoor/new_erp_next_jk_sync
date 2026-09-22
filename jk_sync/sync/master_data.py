@@ -187,6 +187,9 @@ def process_master_updates(data):
             # Prevent Frappe ORM TimestampMismatch errors by removing cloud timestamps
             doc_dict.pop("modified", None)
             doc_dict.pop("_original_modified", None)
+            doc_dict.pop("creation", None)
+            doc_dict.pop("owner", None)
+            doc_dict.pop("modified_by", None)
             
             try:
                 if frappe.db.exists(dt, doc_name):
