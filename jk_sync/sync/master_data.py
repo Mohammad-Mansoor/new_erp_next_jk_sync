@@ -174,6 +174,7 @@ def process_master_updates(data):
     ]
     
     frappe.flags.is_syncing = True
+    frappe.flags.in_import = True
     
     for dt in master_doctypes:
         docs = master_data.get(dt, [])
@@ -196,10 +197,14 @@ def process_master_updates(data):
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
                     doc.flags.ignore_links = True
+                    doc.flags.ignore_validate = True
+                    doc.flags.ignore_mandatory = True
                     doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
                     doc.flags.ignore_links = True
+                    doc.flags.ignore_validate = True
+                    doc.flags.ignore_mandatory = True
                     doc.insert(set_name=doc_name, ignore_permissions=True)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
