@@ -24,7 +24,9 @@ def get_master_updates():
 
     # Master DocTypes in dependency order
     master_doctypes = [
-        "Role", "Company", "Cost Center", "Account", "Warehouse", "UOM", 
+        "Role", "Company", "Branch", "Department", "Designation", "Cost Center", 
+        "Account", "Warehouse", "UOM", "Brand", "Tax Category", 
+        "Item Tax Template", "Sales Taxes and Charges Template",
         "Item Group", "Customer Group", "Mode of Payment", "POS Payment Method",
         "User", "Item", "Customer", "Item Price", "POS Profile"
     ]
