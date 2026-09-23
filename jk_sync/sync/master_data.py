@@ -199,12 +199,21 @@ def process_master_updates(data):
                     doc.flags.ignore_links = True
                     doc.flags.ignore_validate = True
                     doc.flags.ignore_mandatory = True
+                    # Neuter Frappe python business logic
+                    doc.validate = lambda *args, **kwargs: None
+                    doc.before_save = lambda *args, **kwargs: None
+                    doc.on_update = lambda *args, **kwargs: None
                     doc.save(ignore_permissions=True)
                 else:
                     doc = frappe.get_doc(doc_dict)
                     doc.flags.ignore_links = True
                     doc.flags.ignore_validate = True
                     doc.flags.ignore_mandatory = True
+                    # Neuter Frappe python business logic
+                    doc.validate = lambda *args, **kwargs: None
+                    doc.before_insert = lambda *args, **kwargs: None
+                    doc.before_save = lambda *args, **kwargs: None
+                    doc.on_update = lambda *args, **kwargs: None
                     doc.insert(set_name=doc_name, ignore_permissions=True)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
