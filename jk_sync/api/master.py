@@ -27,8 +27,10 @@ def get_master_updates():
         "Role", "Company", "Branch", "Department", "Designation", "Cost Center", 
         "Account", "Warehouse", "UOM", "Brand", "Tax Category", 
         "Item Tax Template", "Sales Taxes and Charges Template",
-        "Item Group", "Customer Group", "Mode of Payment", "POS Payment Method",
-        "User", "Item", "Customer", "Item Price", "POS Profile"
+        "Item Group", "Customer Group", "Territory", "Mode of Payment", "POS Payment Method",
+        "Currency", "Sales Person", "Loyalty Program", "Promotional Scheme", "Pricing Rule",
+        "User", "Item", "Customer", "Address", "Contact", "Item Price", "POS Profile",
+        "Print Format"
     ]
     
     master_data_payload = {}
