@@ -26,7 +26,7 @@ def process_outbox():
             locked_by = %s,
             claim_token = %s,
             locked_at = NOW()
-        WHERE status = 'PENDING'
+        WHERE status IN ('PENDING', 'RETRYABLE_FAILED')
         OR (status = 'PROCESSING' AND locked_at < NOW() - INTERVAL 5 MINUTE)
         LIMIT 50
     """, (worker_uuid, claim_token))
