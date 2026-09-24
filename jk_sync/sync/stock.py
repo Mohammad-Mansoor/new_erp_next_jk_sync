@@ -21,9 +21,12 @@ def log_stock_ledger_entry(doc, method):
     if not branch_id:
         # Try to infer from warehouse
         # If the warehouse name contains the branch ID, or we add a custom field.
-        # Let's add a custom field lookup (we will create it next)
-        branch_id = frappe.db.get_value("Warehouse", doc.warehouse, "branch_id")
-        
+        # Let's add a custom field lookup
+        if frappe.db.has_column("Warehouse", "branch_id"):
+            branch_id = frappe.db.get_value("Warehouse", doc.warehouse, "branch_id")
+        else:
+            branch_id = None
+            
     if not branch_id:
         return
         
