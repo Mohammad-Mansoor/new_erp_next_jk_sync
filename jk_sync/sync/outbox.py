@@ -172,7 +172,7 @@ def enqueue_event(event_type, payload_dict, depends_on=None):
         "doctype": "Branch Sync Outbox",
         "event_id": event_id,
         "event_type": event_type,
-        "payload": json.dumps(payload_dict)
+        "payload": frappe.as_json(payload_dict)
     }
     if depends_on:
         doc_args["depends_on"] = json.dumps(depends_on)
