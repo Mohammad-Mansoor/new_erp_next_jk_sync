@@ -52,6 +52,17 @@ def process_outbox():
         
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.receiver.receive_sync_event"
     
+    # 1. Fast-Fail Circuit Breaker (Ping)
+    try:
+        # Lightweight request with strict 3-second timeout to check internet connectivity
+        ping_url = config.cloud_url.rstrip("/")
+        requests.head(ping_url, timeout=3)
+    except requests.exceptions.RequestException:
+        # Network is down. Return claimed events gracefully to RETRYABLE_FAILED and abort instantly.
+        frappe.db.sql("UPDATE `tabBranch Sync Outbox` SET status='RETRYABLE_FAILED', locked_at=NULL WHERE claim_token=%s", (claim_token,))
+        frappe.db.commit()
+        return
+    
     for event in events:
         # Dependency check
         if event.depends_on:
@@ -136,7 +147,14 @@ def process_outbox():
                 
         except requests.exceptions.RequestException as e:
             mark_status(event.name, claim_token, "RETRYABLE_FAILED", f"Network Error: {str(e)}")
-
+            
+            # 2. Fast-Break Loop
+            # If the internet drops mid-batch, instantly abort the rest of the 50 items 
+            # to prevent 25 minutes of hanging timeouts.
+            frappe.db.sql("UPDATE `tabBranch Sync Outbox` SET status='RETRYABLE_FAILED', locked_at=NULL WHERE claim_token=%s AND status='PROCESSING'", (claim_token,))
+            frappe.db.commit()
+            break
+            
 def mark_status(event_id, claim_token, status, error_log=None):
     if status == "SUCCESS":
         status = "PROCESSED" # Normalize to doctype option
