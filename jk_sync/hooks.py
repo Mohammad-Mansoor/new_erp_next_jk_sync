@@ -152,6 +152,15 @@ doc_events = {
 	},
 	"Stock Ledger Entry": {
 		"after_insert": "jk_sync.sync.stock.log_stock_ledger_entry"
+	},
+	"POS Invoice": {
+		"on_submit": "jk_sync.sync.events.on_pos_invoice_submit"
+	},
+	"POS Exchange": {
+		"on_submit": "jk_sync.sync.events.on_pos_exchange_submit"
+	},
+	"POS Closing Entry": {
+		"on_submit": "jk_sync.sync.events.on_pos_closing_submit"
 	}
 }
 
