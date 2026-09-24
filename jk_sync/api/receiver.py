@@ -21,10 +21,10 @@ def receive_sync_event():
             frappe.local.response['http_status_code'] = 401
             return {"status": "PERMANENT_FAILED", "message": "Missing HMAC headers."}
             
-        # 2. Replay Protection (5 minutes)
+        # 2. Replay Protection (24 hours to account for branch clock drift)
         try:
             timestamp = int(timestamp_str)
-            if abs(time.time() - timestamp) > 300:
+            if abs(time.time() - timestamp) > 86400:
                 frappe.local.response['http_status_code'] = 401
                 return {"status": "PERMANENT_FAILED", "message": "Request timestamp expired."}
         except ValueError:
@@ -171,6 +171,8 @@ def receive_sync_event():
             return {"status": "RETRYABLE_FAILED", "message": f"Missing Dependency: {str(e)}"}
         except frappe.exceptions.DoesNotExistError as e:
             frappe.db.rollback(save_point="sync_event_processing")
+            mark_inbox_failed(event_id, claim_token)
+            frappe.log_error(frappe.get_traceback(), f"Missing Record: {str(e)}")
             return {"status": "RETRYABLE_FAILED", "message": f"Missing Record: {str(e)}"}
         except frappe.exceptions.DuplicateEntryError as e:
             frappe.db.rollback(save_point="sync_event_processing")
