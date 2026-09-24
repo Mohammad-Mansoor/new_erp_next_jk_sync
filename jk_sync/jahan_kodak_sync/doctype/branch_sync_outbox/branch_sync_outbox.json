@@ -30,7 +30,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Event Type",
-   "options": "POS Invoice\nPOS Exchange\nPOS Closing\nCustomer\nItem",
+   "options": "POS Invoice\nPOS Exchange\nPOS Opening\nPOS Closing\nCustomer\nItem",
    "reqd": 1
   },
   {
