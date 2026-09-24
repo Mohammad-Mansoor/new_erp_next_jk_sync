@@ -15,6 +15,11 @@ def on_pos_exchange_submit(doc, method):
         return
     enqueue_event("POS Exchange", {"doc": doc.as_dict()})
 
+def on_pos_opening_submit(doc, method):
+    if getattr(frappe.flags, "is_syncing", False) or not is_branch_server():
+        return
+    enqueue_event("POS Opening", {"doc": doc.as_dict()})
+
 def on_pos_closing_submit(doc, method):
     if getattr(frappe.flags, "is_syncing", False) or not is_branch_server():
         return

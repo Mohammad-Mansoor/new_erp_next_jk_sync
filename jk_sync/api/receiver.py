@@ -143,6 +143,9 @@ def receive_sync_event():
             elif event_type == "POS Closing":
                 from jk_sync.handlers.pos_closing import handle_pos_closing
                 handle_pos_closing(payload)
+            elif event_type == "POS Opening":
+                from jk_sync.handlers.pos_opening import handle_pos_opening
+                handle_pos_opening(payload)
             else:
                 mark_inbox_failed(event_id, claim_token)
                 return {"status": "PERMANENT_FAILED", "message": f"Unsupported event_type: {event_type}"}

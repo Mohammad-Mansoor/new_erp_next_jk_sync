@@ -159,6 +159,9 @@ doc_events = {
 	"POS Exchange": {
 		"on_submit": "jk_sync.sync.events.on_pos_exchange_submit"
 	},
+	"POS Opening Entry": {
+		"on_submit": "jk_sync.sync.events.on_pos_opening_submit"
+	},
 	"POS Closing Entry": {
 		"on_submit": "jk_sync.sync.events.on_pos_closing_submit"
 	}
