@@ -65,10 +65,11 @@ def receive_sync_event():
             return {"status": "PERMANENT_FAILED", "message": "Missing required payload fields."}
             
         # 5. User Authorization
-        user_branch = frappe.db.get_value("User", owner, "branch_id")
-        if user_branch != branch_id:
-            frappe.local.response['http_status_code'] = 403
-            return {"status": "PERMANENT_FAILED", "message": f"User {owner} is not authorized for branch {branch_id}."}
+        if owner != "Administrator":
+            user_branch = frappe.db.get_value("User", owner, "branch_id")
+            if user_branch != branch_id:
+                frappe.local.response['http_status_code'] = 403
+                return {"status": "PERMANENT_FAILED", "message": f"User {owner} is not authorized for branch {branch_id}."}
             
         # 6. Inbox Idempotency - ATOMIC INSERT BARRIER
         payload_hash = hashlib.sha256(payload_str.encode('utf-8')).hexdigest()
