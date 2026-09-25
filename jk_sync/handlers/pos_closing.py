@@ -11,7 +11,7 @@ def handle_pos_closing(payload):
     doc_dict.pop("modified", None)
     
     doc = frappe.get_doc(doc_dict)
-    doc.insert(set_name=True, ignore_permissions=True)
+    doc.insert(set_name=doc.name, set_child_names=False, ignore_permissions=True)
     
     # Submitting the POS Closing Entry naturally causes ERPNext to 
     # generate the consolidated Sales Invoice, GL Entries, and Stock Ledger Entries.

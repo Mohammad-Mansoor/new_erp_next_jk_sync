@@ -15,7 +15,7 @@ def handle_pos_invoice(payload):
     
     doc = frappe.get_doc(doc_dict)
     # Important: set_name=True ensures we use the exact name (e.g. POS-BR01-0001) from the branch
-    doc.insert(set_name=True, ignore_permissions=True)
+    doc.insert(set_name=doc.name, set_child_names=False, ignore_permissions=True)
     doc.submit()
 
 def resolve_canonical_customer(doc_dict):

@@ -11,5 +11,5 @@ def handle_pos_opening(payload):
     doc_dict.pop("modified", None)
     
     doc = frappe.get_doc(doc_dict)
-    doc.insert(set_name=True, ignore_permissions=True)
+    doc.insert(set_name=doc.name, set_child_names=False, ignore_permissions=True)
     doc.submit()
