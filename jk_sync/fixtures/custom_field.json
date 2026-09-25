@@ -665,7 +665,7 @@
   "name": "User-branch_id",
   "no_copy": 0,
   "non_negative": 0,
-  "options": "Branch Sync Config",
+  "options": "Cloud Branch Master",
   "permlevel": 0,
   "placeholder": null,
   "precision": "",
