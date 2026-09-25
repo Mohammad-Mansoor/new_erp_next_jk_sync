@@ -34,7 +34,7 @@ def process_outbox():
     
     # 2. Retrieve claimed rows safely
     events = frappe.db.sql("""
-        SELECT name, event_type, payload, depends_on
+        SELECT name, event_type, payload, depends_on, owner
         FROM `tabBranch Sync Outbox`
         WHERE status = 'PROCESSING' 
         AND locked_by = %s 
@@ -107,7 +107,8 @@ def process_outbox():
             payload_dict = json.loads(payload_json)
             payload_dict["event_id"] = event.name
             payload_dict["event_type"] = event.event_type
-            payload_json = json.dumps(payload_dict)
+            payload_dict["owner"] = event.owner
+            payload_json = frappe.as_json(payload_dict)
         except Exception:
             mark_status(event.name, claim_token, "PERMANENT_FAILED", "Invalid JSON payload.")
             continue
