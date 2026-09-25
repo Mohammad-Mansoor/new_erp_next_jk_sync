@@ -154,15 +154,19 @@ doc_events = {
 		"after_insert": "jk_sync.sync.stock.log_stock_ledger_entry"
 	},
 	"POS Invoice": {
+		"autoname": "jk_sync.sync.events.autoname_with_branch",
 		"on_submit": "jk_sync.sync.events.on_pos_invoice_submit"
 	},
 	"POS Exchange": {
+		"autoname": "jk_sync.sync.events.autoname_with_branch",
 		"on_submit": "jk_sync.sync.events.on_pos_exchange_submit"
 	},
 	"POS Opening Entry": {
+		"autoname": "jk_sync.sync.events.autoname_with_branch",
 		"on_submit": "jk_sync.sync.events.on_pos_opening_submit"
 	},
 	"POS Closing Entry": {
+		"autoname": "jk_sync.sync.events.autoname_with_branch",
 		"on_submit": "jk_sync.sync.events.on_pos_closing_submit"
 	}
 }
