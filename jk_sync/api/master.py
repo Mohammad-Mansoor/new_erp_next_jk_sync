@@ -86,3 +86,61 @@ def get_master_updates():
         "customer_merges": [], 
         "master_data": master_data_payload
     }
+
+@frappe.whitelist(allow_guest=True)
+def get_opening_stock_snapshot():
+    """
+    Whitelisted endpoint called by branch servers to fetch initial opening stock balances.
+    """
+    branch_id = frappe.request.headers.get("X-Branch-ID")
+    if not branch_id:
+        return {"status": "FAILED", "message": "Missing Branch ID header"}
+        
+    secret = frappe.db.get_value("Cloud Branch Master", branch_id, "api_secret")
+    if secret:
+        timestamp_str = frappe.request.headers.get("X-Timestamp")
+        signature = frappe.request.headers.get("X-Signature")
+        payload_bytes = frappe.request.get_data()
+        payload_str = payload_bytes.decode('utf-8')
+        canonical = f"{branch_id}{timestamp_str}{payload_str}"
+        import hmac, hashlib
+        expected_sig = hmac.new(
+            secret.encode('utf-8'),
+            canonical.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        if signature and not hmac.compare_digest(expected_sig, signature):
+            frappe.local.response['http_status_code'] = 401
+            return {"status": "FAILED", "message": "Invalid HMAC signature"}
+            
+    warehouses = []
+    if frappe.db.has_column("Warehouse", "branch_id"):
+        warehouses = frappe.get_all("Warehouse", filters={"branch_id": branch_id}, pluck="name")
+        
+    if not warehouses:
+        warehouses = frappe.get_all("Warehouse", filters=[["name", "like", f"%{branch_id}%"]], pluck="name")
+        
+    if not warehouses:
+        warehouses = frappe.get_all("Warehouse", pluck="name")
+        
+    if not warehouses:
+        return {"status": "SUCCESS", "stock_snapshot": []}
+        
+    bins = frappe.db.sql("""
+        SELECT item_code, warehouse, actual_qty 
+        FROM `tabBin` 
+        WHERE warehouse IN %s AND actual_qty > 0
+    """, (tuple(warehouses),), as_dict=True)
+    
+    frappe.db.sql("""
+        UPDATE `tabCloud Stock Sync Log`
+        SET is_synced = 1
+        WHERE branch_id = %s AND is_synced = 0
+    """, (branch_id,))
+    frappe.db.commit()
+    
+    return {
+        "status": "SUCCESS",
+        "stock_snapshot": bins
+    }
+

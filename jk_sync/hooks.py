@@ -92,7 +92,9 @@ fixtures = [
 # ------------
 
 # before_install = "jk_sync.install.before_install"
-# after_install = "jk_sync.install.after_install"
+after_install = "jk_sync.install.after_install"
+after_migrate = "jk_sync.install.after_migrate"
+
 
 # Uninstallation
 # ------------

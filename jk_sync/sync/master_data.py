@@ -260,3 +260,98 @@ def ack_stock_delta(stock_delta_id):
         requests.post(cloud_url, data=payload_json, headers=headers, timeout=10)
     except Exception:
         pass # If ACK fails, it's fine. Cloud will resend and we will idempotently handle it.
+
+@frappe.whitelist()
+def sync_opening_stock_from_cloud():
+    """
+    Whitelisted method triggered by the UI button on Branch Sync Config.
+    Fetches opening stock snapshot from Cloud and creates a local Stock Entry.
+    """
+    config = frappe.get_single("Branch Sync Config")
+    if not config.cloud_url or not config.branch_id:
+        frappe.throw("Cloud URL and Branch ID must be configured in Branch Sync Config first.")
+        
+    cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.master.get_opening_stock_snapshot"
+    
+    timestamp = str(int(time.time()))
+    payload_json = json.dumps({})
+    canonical = f"{config.branch_id}{timestamp}{payload_json}"
+    
+    headers = {
+        "X-Branch-ID": config.branch_id,
+        "X-Timestamp": timestamp,
+        "Content-Type": "application/json"
+    }
+    
+    if config.api_secret:
+        signature = hmac.new(
+            config.api_secret.encode('utf-8'),
+            canonical.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        headers["X-Signature"] = signature
+        
+    try:
+        response = requests.post(cloud_url, data=payload_json, headers=headers, timeout=30)
+        if response.status_code != 200:
+            return {"status": "FAILED", "message": f"Cloud returned HTTP {response.status_code}: {response.text}"}
+            
+        data = response.json().get("message", {})
+        if data.get("status") != "SUCCESS":
+            return {"status": "FAILED", "message": data.get("message", "Cloud error fetching snapshot")}
+            
+        snapshot = data.get("stock_snapshot", [])
+        if not snapshot:
+            return {"status": "SUCCESS", "message": "No available opening stock found on Cloud for this branch."}
+            
+        by_warehouse = {}
+        for item in snapshot:
+            wh = item.get("warehouse")
+            by_warehouse.setdefault(wh, []).append(item)
+            
+        created_entries = []
+        frappe.flags.is_syncing = True
+        
+        try:
+            for wh, items in by_warehouse.items():
+                wh_company = frappe.db.get_value("Warehouse", wh, "company")
+                if not wh_company:
+                    companies = frappe.get_all("Company", pluck="name")
+                    wh_company = companies[0] if companies else None
+
+                items_list = []
+                for it in items:
+                    items_list.append({
+                        "item_code": it["item_code"],
+                        "t_warehouse": wh,
+                        "qty": abs(it["actual_qty"]),
+                        "basic_rate": 0
+                    })
+                    
+                ste_args = {
+                    "doctype": "Stock Entry",
+                    "stock_entry_type": "Material Receipt",
+                    "purpose": "Material Receipt",
+                    "items": items_list
+                }
+                if wh_company:
+                    ste_args["company"] = wh_company
+
+                ste = frappe.get_doc(ste_args)
+                ste.insert(ignore_permissions=True)
+                ste.submit()
+                created_entries.append(ste.name)
+
+                
+            frappe.db.commit()
+            return {
+                "status": "SUCCESS",
+                "message": f"Successfully created local Opening Stock Entries ({', '.join(created_entries)}) for {len(snapshot)} items."
+            }
+        finally:
+            frappe.flags.is_syncing = False
+            
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Opening Stock Sync Error")
+        return {"status": "FAILED", "message": f"Error syncing opening stock: {str(e)}"}
+
