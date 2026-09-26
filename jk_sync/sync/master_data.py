@@ -43,13 +43,15 @@ def customer_before_rename(doc, method, old, new, merge=False):
     })
     merge_log.insert(ignore_permissions=True)
 
+@frappe.whitelist()
 def poll_master_data():
     """
     Background worker that runs on the branch to poll the Cloud for master data updates.
+    Can also be called directly via RPC / UI button.
     """
     config = frappe.get_single("Branch Sync Config")
     if not config.cloud_url or not config.api_key or not config.api_secret or not config.branch_id:
-        return
+        return {"status": "FAILED", "message": "Branch Sync Config parameters missing."}
         
     # Ask the Cloud for master data updates
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.master.get_master_updates"
@@ -76,8 +78,12 @@ def poll_master_data():
         if response.status_code == 200:
             data = response.json().get("message", {})
             process_master_updates(data)
+            return {"status": "SUCCESS", "message": "Master Data batch polled and updated successfully."}
+        else:
+            return {"status": "FAILED", "message": f"Cloud returned HTTP {response.status_code}"}
     except Exception as e:
         frappe.log_error(f"Polling Failed: {str(e)}", "Sync Polling Error")
+        return {"status": "FAILED", "message": str(e)}
 
 def process_master_updates(data):
     """
