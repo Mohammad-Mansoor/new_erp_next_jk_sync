@@ -48,42 +48,65 @@ def poll_master_data():
     """
     Background worker that runs on the branch to poll the Cloud for master data updates.
     Can also be called directly via RPC / UI button.
+    Loops automatically until all pending master data batches are fetched.
     """
     config = frappe.get_single("Branch Sync Config")
     if not config.cloud_url or not config.api_key or not config.api_secret or not config.branch_id:
         return {"status": "FAILED", "message": "Branch Sync Config parameters missing."}
         
-    # Ask the Cloud for master data updates
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.master.get_master_updates"
     
-    timestamp = str(int(time.time()))
-    last_sync = config.last_master_data_sync or "2000-01-01 00:00:00"
-    payload_json = json.dumps({"last_master_data_sync": str(last_sync)})
-    canonical = f"{config.branch_id}{timestamp}{payload_json}"
-    signature = hmac.new(
-        config.api_secret.encode('utf-8'),
-        canonical.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    total_records = 0
+    iterations = 0
+    max_iterations = 50  # Safety cap to prevent infinite loops
     
-    headers = {
-        "X-Branch-ID": config.branch_id,
-        "X-Timestamp": timestamp,
-        "X-Signature": signature,
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        response = requests.post(cloud_url, data=payload_json, headers=headers, timeout=30)
-        if response.status_code == 200:
+    while iterations < max_iterations:
+        iterations += 1
+        timestamp = str(int(time.time()))
+        
+        # Always reload fresh config to read updated last_master_data_sync timestamp
+        config = frappe.get_single("Branch Sync Config")
+        last_sync = config.last_master_data_sync or "2000-01-01 00:00:00"
+        
+        payload_json = json.dumps({"last_master_data_sync": str(last_sync)})
+        canonical = f"{config.branch_id}{timestamp}{payload_json}"
+        signature = hmac.new(
+            config.api_secret.encode('utf-8'),
+            canonical.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        headers = {
+            "X-Branch-ID": config.branch_id,
+            "X-Timestamp": timestamp,
+            "X-Signature": signature,
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.post(cloud_url, data=payload_json, headers=headers, timeout=60)
+            if response.status_code != 200:
+                return {"status": "FAILED", "message": f"Cloud returned HTTP {response.status_code}"}
+                
             data = response.json().get("message", {})
+            master_data = data.get("master_data", {})
+            batch_count = sum(len(docs) for docs in master_data.values())
+            total_records += batch_count
+            
             process_master_updates(data)
-            return {"status": "SUCCESS", "message": "Master Data batch polled and updated successfully."}
-        else:
-            return {"status": "FAILED", "message": f"Cloud returned HTTP {response.status_code}"}
-    except Exception as e:
-        frappe.log_error(f"Polling Failed: {str(e)}", "Sync Polling Error")
-        return {"status": "FAILED", "message": str(e)}
+            
+            has_more = data.get("has_more", False)
+            if not has_more or batch_count == 0:
+                break
+                
+        except Exception as e:
+            frappe.log_error(f"Polling Failed: {str(e)}", "Sync Polling Error")
+            return {"status": "FAILED", "message": str(e)}
+            
+    return {
+        "status": "SUCCESS", 
+        "message": f"Master Data sync complete. Synced {total_records} records across {iterations} batch(es)."
+    }
 
 def process_master_updates(data):
     """
