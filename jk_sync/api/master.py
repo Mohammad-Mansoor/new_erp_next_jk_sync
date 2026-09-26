@@ -127,7 +127,7 @@ def get_opening_stock_snapshot():
         return {"status": "SUCCESS", "stock_snapshot": []}
         
     bins = frappe.db.sql("""
-        SELECT item_code, warehouse, actual_qty 
+        SELECT item_code, warehouse, actual_qty, valuation_rate
         FROM `tabBin` 
         WHERE warehouse IN %s AND actual_qty > 0
     """, (tuple(warehouses),), as_dict=True)

@@ -141,7 +141,8 @@ def process_master_updates(data):
                         "t_warehouse": delta["warehouse"] if delta["qty_change"] > 0 else None,
                         "s_warehouse": delta["warehouse"] if delta["qty_change"] < 0 else None,
                         "qty": abs(delta["qty_change"]),
-                        "basic_rate": 0 
+                        "basic_rate": 0,
+                        "allow_zero_valuation_rate": 1
                     }]
                 })
                 # We tell the Cloud Hook (if any) to ignore this via flags, but this is a local insert.
@@ -320,13 +321,22 @@ def sync_opening_stock_from_cloud():
                     wh_company = companies[0] if companies else None
 
                 items_list = []
+                skipped_items = []
                 for it in items:
+                    if not frappe.db.exists("Item", it["item_code"]):
+                        skipped_items.append(it["item_code"])
+                        continue
+
                     items_list.append({
                         "item_code": it["item_code"],
                         "t_warehouse": wh,
                         "qty": abs(it["actual_qty"]),
-                        "basic_rate": 0
+                        "basic_rate": it.get("valuation_rate") or 0,
+                        "allow_zero_valuation_rate": 1
                     })
+
+                if not items_list:
+                    continue
                     
                 ste_args = {
                     "doctype": "Stock Entry",
@@ -341,6 +351,7 @@ def sync_opening_stock_from_cloud():
                 ste.insert(ignore_permissions=True)
                 ste.submit()
                 created_entries.append(ste.name)
+
 
                 
             frappe.db.commit()
