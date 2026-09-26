@@ -45,7 +45,8 @@ def get_master_updates():
             dt, 
             filters={"modified": (">", last_sync)},
             order_by="modified asc",
-            limit=CHUNK_LIMIT
+            limit=CHUNK_LIMIT,
+            ignore_permissions=True
         )
         
         doc_list = []
@@ -72,7 +73,8 @@ def get_master_updates():
     stock_logs = frappe.get_all(
         "Cloud Stock Sync Log", 
         filters={"branch_id": branch_id, "is_synced": 0},
-        fields=["name", "item_code", "warehouse", "qty_change", "reference_doctype", "reference_name"]
+        fields=["name", "item_code", "warehouse", "qty_change", "reference_doctype", "reference_name"],
+        ignore_permissions=True
     )
     
     for log in stock_logs:
