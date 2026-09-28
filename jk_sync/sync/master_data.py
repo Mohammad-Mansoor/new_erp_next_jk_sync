@@ -229,7 +229,24 @@ def process_master_updates(data):
             doc_dict.pop("modified_by", None)
             
             try:
+                # Handle User username collision
+                if dt == "User":
+                    incoming_username = doc_dict.get("username")
+                    if incoming_username:
+                        conflicting_user = frappe.db.get_value("User", {"username": incoming_username, "name": ("!=", doc_name)}, "name")
+                        if conflicting_user:
+                            import string, random
+                            random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+                            frappe.db.set_value("User", conflicting_user, "username", f"{incoming_username}_{random_suffix}")
+                            frappe.db.commit()
+
                 if frappe.db.exists(dt, doc_name):
+                    # Wipe child tables for non-tree doctypes to prevent Duplicate Entry errors on update
+                    meta = frappe.get_meta(dt)
+                    if not meta.is_tree:
+                        for df in meta.get_table_fields():
+                            frappe.db.delete(df.options, {"parent": doc_name})
+
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
                     doc.flags.ignore_links = True
@@ -405,8 +422,28 @@ def sync_opening_stock_from_cloud():
                     ste_args["company"] = wh_company
 
                 ste = frappe.get_doc(ste_args)
+
+                # Identify inactive/end-of-life items and temporarily activate them
+                revert_items = []
+                for it in items_list:
+                    item_doc = frappe.get_doc("Item", it["item_code"])
+                    if item_doc.disabled or item_doc.end_of_life:
+                        revert_items.append({
+                            "item_code": item_doc.name,
+                            "disabled": item_doc.disabled,
+                            "end_of_life": item_doc.end_of_life
+                        })
+                        frappe.db.set_value("Item", item_doc.name, "disabled", 0)
+                        frappe.db.set_value("Item", item_doc.name, "end_of_life", None)
+
                 ste.insert(ignore_permissions=True)
                 ste.submit()
+
+                # Revert items back to their disabled/end-of-life state
+                for rev in revert_items:
+                    frappe.db.set_value("Item", rev["item_code"], "disabled", rev["disabled"])
+                    frappe.db.set_value("Item", rev["item_code"], "end_of_life", rev["end_of_life"])
+
                 created_entries.append(ste.name)
 
 
