@@ -210,7 +210,9 @@ def process_master_updates(data):
     
     for dt in master_doctypes:
         docs = master_data.get(dt, [])
-        
+        if not docs:
+            continue
+            
         if frappe.get_meta(dt).is_tree:
             docs = sorted(docs, key=lambda x: x.get("lft") or 0)
             
@@ -231,6 +233,8 @@ def process_master_updates(data):
                     doc.flags.ignore_links = True
                     doc.flags.ignore_validate = True
                     doc.flags.ignore_mandatory = True
+                    if dt == "Company":
+                        doc.flags.ignore_chart_of_accounts = True
                     # Neuter Frappe python business logic
                     doc.validate = lambda *args, **kwargs: None
                     doc.before_save = lambda *args, **kwargs: None
@@ -241,6 +245,8 @@ def process_master_updates(data):
                     doc.flags.ignore_links = True
                     doc.flags.ignore_validate = True
                     doc.flags.ignore_mandatory = True
+                    if dt == "Company":
+                        doc.flags.ignore_chart_of_accounts = True
                     # Neuter Frappe python business logic
                     doc.validate = lambda *args, **kwargs: None
                     doc.before_insert = lambda *args, **kwargs: None
@@ -249,6 +255,15 @@ def process_master_updates(data):
                     doc.insert(set_name=doc_name, ignore_permissions=True)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
+                
+        # Rebuild tree structure for Tree DocTypes after importing batch
+        if frappe.get_meta(dt).is_tree:
+            try:
+                parent_field = "parent_" + dt.lower().replace(" ", "_")
+                from frappe.utils.nestedset import rebuild_tree
+                rebuild_tree(dt, parent_field)
+            except Exception as e:
+                frappe.log_error(title="Tree Rebuild Error", message=f"Failed to rebuild tree for {dt}: {str(e)}")
                 
     frappe.flags.is_syncing = False
     
