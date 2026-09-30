@@ -42,7 +42,7 @@ def process_outbox():
     """, (worker_uuid, claim_token), as_dict=True)
     
     status_counts = frappe.db.sql("SELECT status, count(name) as count FROM `tabBranch Sync Outbox` GROUP BY status", as_dict=True)
-    frappe.log_error(title="Outbox Worker Debug", message=f"Worker claimed: {len(events)} events. DB State: {status_counts}")
+    frappe.log_error(title="Outbox Worker Debug", message=f"Site: {frappe.local.site} | DB: {frappe.conf.db_name} | DB State: {status_counts}")
     
     if not events:
         return
