@@ -51,7 +51,7 @@ def poll_master_data():
     Loops automatically until all pending master data batches are fetched.
     """
     config = frappe.get_single("Branch Sync Config")
-    if not config.cloud_url or not config.api_key or not config.api_secret or not config.branch_id:
+    if not config.cloud_url or not config.api_key or not config.get_password("api_secret") or not config.branch_id:
         return {"status": "FAILED", "message": "Branch Sync Config parameters missing."}
         
     cloud_url = config.cloud_url.rstrip("/") + "/api/method/jk_sync.api.master.get_master_updates"
@@ -71,7 +71,7 @@ def poll_master_data():
         payload_json = json.dumps({"last_master_data_sync": str(last_sync)})
         canonical = f"{config.branch_id}{timestamp}{payload_json}"
         signature = hmac.new(
-            config.api_secret.encode('utf-8'),
+            config.get_password("api_secret").encode('utf-8'),
             canonical.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
@@ -319,7 +319,7 @@ def ack_stock_delta(stock_delta_id):
     payload_json = json.dumps({"stock_delta_id": stock_delta_id})
     canonical = f"{config.branch_id}{timestamp}{payload_json}"
     signature = hmac.new(
-        config.api_secret.encode('utf-8'),
+        config.get_password("api_secret").encode('utf-8'),
         canonical.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
@@ -358,9 +358,9 @@ def sync_opening_stock_from_cloud():
         "Content-Type": "application/json"
     }
     
-    if config.api_secret:
+    if config.get_password("api_secret"):
         signature = hmac.new(
-            config.api_secret.encode('utf-8'),
+            config.get_password("api_secret").encode('utf-8'),
             canonical.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()

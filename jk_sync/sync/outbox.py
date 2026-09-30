@@ -45,7 +45,7 @@ def process_outbox():
         return
         
     config = frappe.get_single("Branch Sync Config")
-    if not config.cloud_url or not config.api_key or not config.api_secret or not config.branch_id:
+    if not config.cloud_url or not config.api_key or not config.get_password("api_secret") or not config.branch_id:
         frappe.db.sql("UPDATE `tabBranch Sync Outbox` SET status='PENDING', locked_at=NULL WHERE claim_token=%s", (claim_token,))
         frappe.db.commit()
         return
@@ -116,7 +116,7 @@ def process_outbox():
         timestamp = str(int(time.time()))
         canonical = f"{config.branch_id}{timestamp}{payload_json}"
         signature = hmac.new(
-            config.api_secret.encode('utf-8'),
+            config.get_password("api_secret").encode('utf-8'),
             canonical.encode('utf-8'),
             hashlib.sha256
         ).hexdigest()
