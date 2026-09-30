@@ -24,7 +24,7 @@ def receive_sync_event():
         # 2. Replay Protection (24 hours to account for branch clock drift)
         try:
             timestamp = int(timestamp_str)
-            if abs(time.time() - timestamp) > 86400:
+            if abs(time.time() - timestamp) > 172800:
                 frappe.local.response['http_status_code'] = 401
                 return {"status": "PERMANENT_FAILED", "message": "Request timestamp expired."}
         except ValueError:
