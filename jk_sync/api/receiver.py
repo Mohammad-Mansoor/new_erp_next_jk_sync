@@ -185,7 +185,7 @@ def receive_sync_event():
             
     except Exception as e:
         frappe.log_error(title="Sync Receiver Fatal Error", message=frappe.get_traceback())
-        return {"status": "RETRYABLE_FAILED", "message": "Internal Server Error"}
+        return {"status": "RETRYABLE_FAILED", "message": f"CRASH: {str(e)}"}
 
 def mark_inbox_failed(event_id, claim_token):
     frappe.db.sql("""
