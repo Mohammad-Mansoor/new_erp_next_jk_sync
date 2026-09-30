@@ -171,7 +171,7 @@ def receive_sync_event():
         except frappe.exceptions.DoesNotExistError as e:
             frappe.db.rollback(save_point="sync_event_processing")
             mark_inbox_failed(event_id, claim_token)
-            frappe.log_error(frappe.get_traceback(), f"Missing Record: {str(e)}")
+            frappe.log_error(title=f"Missing Record: {str(e)}", message=frappe.get_traceback())
             return {"status": "RETRYABLE_FAILED", "message": f"Missing Record: {str(e)}"}
         except frappe.exceptions.DuplicateEntryError as e:
             frappe.db.rollback(save_point="sync_event_processing")
@@ -179,12 +179,12 @@ def receive_sync_event():
             return {"status": "PERMANENT_FAILED", "message": f"Business Identity Collision: {str(e)}"}
         except Exception as e:
             frappe.db.rollback(save_point="sync_event_processing")
-            frappe.log_error(frappe.get_traceback(), f"Sync Error: {event_id}")
+            frappe.log_error(title=f"Sync Error: {event_id}", message=frappe.get_traceback())
             mark_inbox_failed(event_id, claim_token)
             return {"status": "PERMANENT_FAILED", "message": str(e)}
             
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Sync Receiver Fatal Error")
+        frappe.log_error(title="Sync Receiver Fatal Error", message=frappe.get_traceback())
         return {"status": "RETRYABLE_FAILED", "message": "Internal Server Error"}
 
 def mark_inbox_failed(event_id, claim_token):
