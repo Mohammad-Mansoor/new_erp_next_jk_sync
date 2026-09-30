@@ -41,8 +41,8 @@ def process_outbox():
         AND claim_token = %s
     """, (worker_uuid, claim_token), as_dict=True)
     
-    pending_count = frappe.db.sql("SELECT count(name) FROM `tabBranch Sync Outbox` WHERE status='PENDING'")[0][0]
-    frappe.log_error(title="Outbox Worker Debug", message=f"Worker claimed: {len(events)} events. Remaining PENDING: {pending_count}")
+    status_counts = frappe.db.sql("SELECT status, count(name) as count FROM `tabBranch Sync Outbox` GROUP BY status", as_dict=True)
+    frappe.log_error(title="Outbox Worker Debug", message=f"Worker claimed: {len(events)} events. DB State: {status_counts}")
     
     if not events:
         return
