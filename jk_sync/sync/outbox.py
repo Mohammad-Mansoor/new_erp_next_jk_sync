@@ -60,7 +60,7 @@ def process_outbox():
     try:
         # Lightweight request with strict 3-second timeout to check internet connectivity
         ping_url = config.cloud_url.rstrip("/")
-        requests.head(ping_url, timeout=3)
+        requests.head(ping_url, timeout=10)
     except requests.exceptions.RequestException as e:
         # Network is down. Return claimed events gracefully to RETRYABLE_FAILED and abort instantly.
         frappe.log_error(title="Outbox Worker Debug", message=f"Aborted: Network down. {str(e)}")

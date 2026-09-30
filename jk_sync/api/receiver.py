@@ -30,7 +30,10 @@ def receive_sync_event():
             return {"status": "PERMANENT_FAILED", "message": "Invalid timestamp format."}
             
         # 3. Authenticate Branch
-        secret = frappe.db.get_value("Cloud Branch Master", branch_id, "api_secret")
+        try:
+            secret = frappe.get_doc("Cloud Branch Master", branch_id).get_password("api_secret")
+        except Exception:
+            secret = None
         if not secret:
             frappe.local.response['http_status_code'] = 401
             return {"status": "PERMANENT_FAILED", "message": "Branch ID not found or unauthorized."}

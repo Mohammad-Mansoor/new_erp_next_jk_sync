@@ -98,7 +98,10 @@ def get_opening_stock_snapshot():
     if not branch_id:
         return {"status": "FAILED", "message": "Missing Branch ID header"}
         
-    secret = frappe.db.get_value("Cloud Branch Master", branch_id, "api_secret")
+    try:
+        secret = frappe.get_doc("Cloud Branch Master", branch_id).get_password("api_secret")
+    except Exception:
+        secret = None
     if secret:
         timestamp_str = frappe.request.headers.get("X-Timestamp")
         signature = frappe.request.headers.get("X-Signature")
