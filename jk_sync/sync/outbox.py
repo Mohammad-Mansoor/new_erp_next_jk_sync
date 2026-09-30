@@ -41,11 +41,15 @@ def process_outbox():
         AND claim_token = %s
     """, (worker_uuid, claim_token), as_dict=True)
     
+    pending_count = frappe.db.sql("SELECT count(name) FROM `tabBranch Sync Outbox` WHERE status='PENDING'")[0][0]
+    frappe.log_error(title="Outbox Worker Debug", message=f"Worker claimed: {len(events)} events. Remaining PENDING: {pending_count}")
+    
     if not events:
         return
         
     config = frappe.get_single("Branch Sync Config")
     if not config.cloud_url or not config.api_key or not config.get_password("api_secret") or not config.branch_id:
+        frappe.log_error(title="Outbox Worker Debug", message=f"Aborted: Config values missing. URL: {config.cloud_url}, Key: {config.api_key}")
         frappe.db.sql("UPDATE `tabBranch Sync Outbox` SET status='PENDING', locked_at=NULL WHERE claim_token=%s", (claim_token,))
         frappe.db.commit()
         return
@@ -57,8 +61,9 @@ def process_outbox():
         # Lightweight request with strict 3-second timeout to check internet connectivity
         ping_url = config.cloud_url.rstrip("/")
         requests.head(ping_url, timeout=3)
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
         # Network is down. Return claimed events gracefully to RETRYABLE_FAILED and abort instantly.
+        frappe.log_error(title="Outbox Worker Debug", message=f"Aborted: Network down. {str(e)}")
         frappe.db.sql("UPDATE `tabBranch Sync Outbox` SET status='RETRYABLE_FAILED', locked_at=NULL WHERE claim_token=%s", (claim_token,))
         frappe.db.commit()
         return
