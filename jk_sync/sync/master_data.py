@@ -18,21 +18,9 @@ def log_master_data_rename(doc, method, old=None, new=None, merge=False):
     ]
     if doc.doctype in master_doctypes:
         frappe.db.sql("""
-            CREATE TABLE IF NOT EXISTS `tabCloud Rename Log` (
-                `name` varchar(140) NOT NULL,
-                `creation` datetime(6) DEFAULT NULL,
-                `reference_doctype` varchar(140) DEFAULT NULL,
-                `old_name` varchar(140) DEFAULT NULL,
-                `new_name` varchar(140) DEFAULT NULL,
-                PRIMARY KEY (`name`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        """)
-        
-        frappe.db.sql("""
             INSERT INTO `tabCloud Rename Log` (name, creation, reference_doctype, old_name, new_name)
             VALUES (%s, %s, %s, %s, %s)
         """, (str(uuid.uuid4())[:20], frappe.utils.now_datetime(), doc.doctype, old, new))
-        frappe.db.commit()
 
 def customer_before_rename(doc, method, old, new, merge=False):
     if not merge:
