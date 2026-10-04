@@ -124,6 +124,27 @@ def poll_master_data():
         "message": f"Master Data sync complete. Synced {total_records} records across {iterations} batch(es)."
     }
 
+def _sync_child_tables_for_bypass(dt, doc_name, doc_dict):
+    """
+    Manually sync child tables when using db_insert/db_update bypass methods.
+    """
+    meta = frappe.get_meta(dt)
+    for df in meta.get_table_fields():
+        child_docs = doc_dict.get(df.fieldname, [])
+        # Always wipe existing children for this parent/field to ensure exact mirror
+        frappe.db.delete(df.options, {"parent": doc_name, "parentfield": df.fieldname})
+        
+        for i, child_dict in enumerate(child_docs):
+            child_doc = frappe.new_doc(df.options)
+            child_doc.update(child_dict)
+            child_doc.parent = doc_name
+            child_doc.parenttype = dt
+            child_doc.parentfield = df.fieldname
+            child_doc.idx = i + 1
+            if not child_doc.name:
+                child_doc.name = frappe.generate_hash(length=10)
+            child_doc.db_insert()
+
 def process_master_updates(data):
     """
     Process the downloaded master data locally.
@@ -144,7 +165,7 @@ def process_master_updates(data):
         
         try:
             if frappe.db.exists(rlog.get("reference_doctype"), rlog.get("old_name")):
-                frappe.rename_doc(rlog.get("reference_doctype"), rlog.get("old_name"), rlog.get("new_name"), merge=False, ignore_if_exists=True)
+                frappe.rename_doc(rlog.get("reference_doctype"), rlog.get("old_name"), rlog.get("new_name"), merge=False, ignore_if_exists=True, force=True)
             local_log.status = "Success"
         except Exception:
             local_log.status = "Failed"
@@ -303,6 +324,7 @@ def process_master_updates(data):
                     doc.run_method = lambda *args, **kwargs: None
                     if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
                         doc.db_update()
+                        _sync_child_tables_for_bypass(dt, doc_name, doc_dict)
                     else:
                         doc.save(ignore_permissions=True)
                     
@@ -326,6 +348,7 @@ def process_master_updates(data):
                     if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
                         doc.name = doc_name
                         doc.db_insert()
+                        _sync_child_tables_for_bypass(dt, doc_name, doc_dict)
                     else:
                         doc.insert(set_name=doc_name, ignore_permissions=True)
                         
