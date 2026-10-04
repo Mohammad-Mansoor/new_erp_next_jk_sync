@@ -73,7 +73,7 @@ def get_master_updates():
     rename_logs = []
     try:
         rename_logs = frappe.db.sql("""
-            SELECT reference_doctype, old_name, new_name, creation 
+            SELECT name, reference_doctype, old_name, new_name, creation 
             FROM `tabCloud Rename Log` 
             WHERE creation > %s
             ORDER BY creation ASC

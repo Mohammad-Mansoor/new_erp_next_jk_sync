@@ -131,11 +131,28 @@ def process_master_updates(data):
     # 0. Process Rename Logs (Must be done BEFORE master data updates)
     rename_logs = data.get("rename_logs", [])
     for rlog in rename_logs:
+        # Ignore if we already processed this log (idempotency)
+        if rlog.get("name") and frappe.db.exists("Cloud Rename Log", rlog.get("name")):
+            continue
+            
+        local_log = frappe.new_doc("Cloud Rename Log")
+        if rlog.get("name"):
+            local_log.name = rlog.get("name")
+        local_log.reference_doctype = rlog.get("reference_doctype")
+        local_log.old_name = rlog.get("old_name")
+        local_log.new_name = rlog.get("new_name")
+        
         try:
             if frappe.db.exists(rlog.get("reference_doctype"), rlog.get("old_name")):
-                frappe.rename_doc(rlog.get("reference_doctype"), rlog.get("old_name"), rlog.get("new_name"), merge=False, ignore_permissions=True)
+                frappe.rename_doc(rlog.get("reference_doctype"), rlog.get("old_name"), rlog.get("new_name"), merge=False, ignore_if_exists=True)
+            local_log.status = "Success"
         except Exception:
-            frappe.log_error(frappe.get_traceback(), f"Rename Failed {rlog.get('old_name')} -> {rlog.get('new_name')}")
+            local_log.status = "Failed"
+            local_log.error_log = frappe.get_traceback()
+            frappe.log_error(local_log.error_log, f"Rename Failed {rlog.get('old_name')} -> {rlog.get('new_name')}")
+            
+        local_log.insert(ignore_permissions=True, set_name=rlog.get("name"))
+        frappe.db.commit()
 
     # 1. Processing Merged Customers locally
     merge_logs = data.get("customer_merges", [])

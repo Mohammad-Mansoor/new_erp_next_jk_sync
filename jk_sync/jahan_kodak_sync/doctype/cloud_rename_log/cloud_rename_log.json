@@ -9,7 +9,9 @@
  "field_order": [
   "reference_doctype",
   "old_name",
-  "new_name"
+  "new_name",
+  "status",
+  "error_log"
  ],
  "fields": [
   {
@@ -26,12 +28,24 @@
    "fieldname": "new_name",
    "fieldtype": "Data",
    "label": "New Name"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Text",
+   "label": "Error Log"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-04 23:13:07.535436",
+ "modified": "2026-10-04 23:35:39.591001",
  "modified_by": "Administrator",
  "module": "Jahan Kodak Sync",
  "name": "Cloud Rename Log",
