@@ -149,6 +149,9 @@ after_migrate = "jk_sync.install.after_migrate"
 # Hook on document methods and events
 
 doc_events = {
+	"*": {
+		"after_rename": "jk_sync.sync.master_data.log_master_data_rename"
+	},
 	"Customer": {
 		"before_rename": "jk_sync.sync.master_data.customer_before_rename"
 	},

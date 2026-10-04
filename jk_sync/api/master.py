@@ -69,6 +69,19 @@ def get_master_updates():
         if doc_list:
             master_data_payload[dt] = doc_list
             
+    # Fetch Rename Logs
+    rename_logs = []
+    try:
+        rename_logs = frappe.db.sql("""
+            SELECT reference_doctype, old_name, new_name, creation 
+            FROM `tabCloud Rename Log` 
+            WHERE creation > %s
+            ORDER BY creation ASC
+            LIMIT 5000
+        """, (last_sync,), as_dict=True)
+    except Exception:
+        pass # Table might not exist yet
+        
     # Fetch Stock Sync Logs
     stock_logs = frappe.get_all(
         "Cloud Stock Sync Log", 
@@ -86,7 +99,8 @@ def get_master_updates():
         "next_sync_timestamp": str(safe_next_sync),
         "stock_deltas": stock_logs,
         "customer_merges": [], 
-        "master_data": master_data_payload
+        "master_data": master_data_payload,
+        "rename_logs": rename_logs
     }
 
 @frappe.whitelist(allow_guest=True)

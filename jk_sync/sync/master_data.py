@@ -6,6 +6,34 @@ import hmac
 import hashlib
 import uuid
 
+def log_master_data_rename(doc, method, old=None, new=None, merge=False):
+    master_doctypes = [
+        "Role", "Custom DocPerm", "Company", "Branch", "Department", "Designation", "Cost Center", 
+        "Account", "Warehouse", "UOM", "Brand", "Tax Category", 
+        "Item Tax Template", "Sales Taxes and Charges Template",
+        "Item Group", "Customer Group", "Territory", "Mode of Payment", "POS Payment Method",
+        "Currency", "Sales Person", "Loyalty Program", "Promotional Scheme", "Pricing Rule",
+        "User", "Item", "Customer", "Address", "Contact", "Item Price", "POS Profile",
+        "Print Format"
+    ]
+    if doc.doctype in master_doctypes:
+        frappe.db.sql("""
+            CREATE TABLE IF NOT EXISTS `tabCloud Rename Log` (
+                `name` varchar(140) NOT NULL,
+                `creation` datetime(6) DEFAULT NULL,
+                `reference_doctype` varchar(140) DEFAULT NULL,
+                `old_name` varchar(140) DEFAULT NULL,
+                `new_name` varchar(140) DEFAULT NULL,
+                PRIMARY KEY (`name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """)
+        
+        frappe.db.sql("""
+            INSERT INTO `tabCloud Rename Log` (name, creation, reference_doctype, old_name, new_name)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (str(uuid.uuid4())[:20], frappe.utils.now_datetime(), doc.doctype, old, new))
+        frappe.db.commit()
+
 def customer_before_rename(doc, method, old, new, merge=False):
     if not merge:
         return
@@ -112,6 +140,15 @@ def process_master_updates(data):
     """
     Process the downloaded master data locally.
     """
+    # 0. Process Rename Logs (Must be done BEFORE master data updates)
+    rename_logs = data.get("rename_logs", [])
+    for rlog in rename_logs:
+        try:
+            if frappe.db.exists(rlog.get("reference_doctype"), rlog.get("old_name")):
+                frappe.rename_doc(rlog.get("reference_doctype"), rlog.get("old_name"), rlog.get("new_name"), merge=False, ignore_permissions=True)
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), f"Rename Failed {rlog.get('old_name')} -> {rlog.get('new_name')}")
+
     # 1. Processing Merged Customers locally
     merge_logs = data.get("customer_merges", [])
     for merge in merge_logs:
