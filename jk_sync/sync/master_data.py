@@ -259,10 +259,13 @@ def process_master_updates(data):
                     doc.run_before_save_methods = lambda *args, **kwargs: None
                     doc.run_post_save_methods = lambda *args, **kwargs: None
                     doc.run_method = lambda *args, **kwargs: None
-                    if frappe.get_meta(dt).is_tree:
+                    if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
                         doc.db_update()
                     else:
                         doc.save(ignore_permissions=True)
+                    
+                    if dt == "Custom DocPerm":
+                        frappe.clear_cache(doctype=doc.parent)
                 else:
                     doc = frappe.get_doc(doc_dict)
                     doc.flags.ignore_links = True
@@ -278,11 +281,14 @@ def process_master_updates(data):
                     
                     # For Tree DocTypes, if parent is missing, Frappe throws NestedSet Child errors.
                     # We can use db_insert directly to bypass Frappe's insert validation entirely
-                    if frappe.get_meta(dt).is_tree:
+                    if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
                         doc.name = doc_name
                         doc.db_insert()
                     else:
                         doc.insert(set_name=doc_name, ignore_permissions=True)
+                        
+                    if dt == "Custom DocPerm":
+                        frappe.clear_cache(doctype=doc.parent)
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
                 
