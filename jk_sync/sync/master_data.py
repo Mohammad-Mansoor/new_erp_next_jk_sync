@@ -264,7 +264,7 @@ def process_master_updates(data):
         "Item Tax Template", "Sales Taxes and Charges Template",
         "Item Group", "Customer Group", "Territory", "Mode of Payment", "POS Payment Method",
         "Currency", "Sales Person", "Loyalty Program", "Promotional Scheme", "Pricing Rule",
-        "User", "Item", "Customer", "Address", "Contact", "Item Price", "POS Profile",
+        "User", "Notification Settings", "Item", "Customer", "Address", "Contact", "Item Price", "POS Profile",
         "Print Format"
     ]
     
