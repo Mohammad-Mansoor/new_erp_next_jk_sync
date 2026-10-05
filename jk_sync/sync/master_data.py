@@ -303,13 +303,15 @@ def process_master_updates(data):
                             frappe.db.set_value("User", conflicting_user, "username", f"{incoming_username}_{random_suffix}")
                             frappe.db.commit()
 
-                if frappe.db.exists(dt, doc_name):
-                    # Wipe child tables for non-tree doctypes to prevent Duplicate Entry errors on update
-                    meta = frappe.get_meta(dt)
-                    if not meta.is_tree:
-                        for df in meta.get_table_fields():
-                            frappe.db.delete(df.options, {"parent": doc_name})
+                meta = frappe.get_meta(dt)
+                
+                # 1. Pop out ALL child tables from doc_dict so Frappe's ORM never sees them
+                child_tables_dict = {}
+                for df in meta.get_table_fields():
+                    if df.fieldname in doc_dict:
+                        child_tables_dict[df.fieldname] = doc_dict.pop(df.fieldname)
 
+                if frappe.db.exists(dt, doc_name):
                     doc = frappe.get_doc(dt, doc_name)
                     doc.update(doc_dict)
                     doc.flags.ignore_links = True
@@ -322,12 +324,8 @@ def process_master_updates(data):
                     doc.run_before_save_methods = lambda *args, **kwargs: None
                     doc.run_post_save_methods = lambda *args, **kwargs: None
                     doc.run_method = lambda *args, **kwargs: None
-                    if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
-                        doc.db_update()
-                        _sync_child_tables_for_bypass(dt, doc_name, doc_dict)
-                    else:
-                        doc.save(ignore_permissions=True)
                     
+                    doc.db_update()
                     if dt == "Custom DocPerm":
                         frappe.clear_cache(doctype=doc.parent)
                 else:
@@ -343,17 +341,28 @@ def process_master_updates(data):
                     doc.run_post_save_methods = lambda *args, **kwargs: None
                     doc.run_method = lambda *args, **kwargs: None
                     
-                    # For Tree DocTypes, if parent is missing, Frappe throws NestedSet Child errors.
-                    # We can use db_insert directly to bypass Frappe's insert validation entirely
-                    if frappe.get_meta(dt).is_tree or dt == "Custom DocPerm":
-                        doc.name = doc_name
-                        doc.db_insert()
-                        _sync_child_tables_for_bypass(dt, doc_name, doc_dict)
-                    else:
-                        doc.insert(set_name=doc_name, ignore_permissions=True)
+                    doc.name = doc_name
+                    doc.db_insert()
                         
                     if dt == "Custom DocPerm":
                         frappe.clear_cache(doctype=doc.parent)
+                        
+                # 2. UNIVERSAL CHILD TABLE INJECTOR
+                for df in meta.get_table_fields():
+                    child_docs = child_tables_dict.get(df.fieldname, [])
+                    # Wipe existing children for this parent/field to ensure exact mirror
+                    frappe.db.delete(df.options, {"parent": doc_name, "parentfield": df.fieldname})
+                    
+                    for i, child_dict in enumerate(child_docs):
+                        child_doc = frappe.new_doc(df.options)
+                        child_doc.update(child_dict)
+                        child_doc.parent = doc_name
+                        child_doc.parenttype = dt
+                        child_doc.parentfield = df.fieldname
+                        child_doc.idx = i + 1
+                        if not child_doc.name:
+                            child_doc.name = frappe.generate_hash(length=10)
+                        child_doc.db_insert()
             except Exception as e:
                 frappe.log_error(title="Master Data Sync Error", message=f"Failed to upsert {dt} {doc_name}: {str(e)}")
                 
