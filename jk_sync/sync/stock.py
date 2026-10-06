@@ -40,6 +40,7 @@ def log_stock_ledger_entry(doc, method):
         "branch_id": branch_id,
         "item_code": doc.item_code,
         "warehouse": doc.warehouse,
+        "company": doc.company,
         "qty_change": doc.actual_qty,
         "reference_doctype": doc.voucher_type,
         "reference_name": doc.voucher_no

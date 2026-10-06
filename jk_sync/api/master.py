@@ -86,7 +86,7 @@ def get_master_updates():
     stock_logs = frappe.get_all(
         "Cloud Stock Sync Log", 
         filters={"branch_id": branch_id, "is_synced": 0},
-        fields=["name", "item_code", "warehouse", "qty_change", "reference_doctype", "reference_name"],
+        fields=["name", "item_code", "warehouse", "company", "qty_change", "reference_doctype", "reference_name"],
         ignore_permissions=True
     )
     

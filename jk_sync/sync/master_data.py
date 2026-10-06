@@ -226,6 +226,7 @@ def process_master_updates(data):
                 purpose = "Material Receipt" if delta["qty_change"] > 0 else "Material Issue"
                 ste = frappe.get_doc({
                     "doctype": "Stock Entry",
+                    "company": delta.get("company") or frappe.db.get_value("Warehouse", delta["warehouse"], "company"),
                     "stock_entry_type": purpose,
                     "purpose": purpose,
                     "items": [{
