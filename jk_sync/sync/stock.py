@@ -34,6 +34,11 @@ def log_stock_ledger_entry(doc, method):
     if doc.voucher_type == "POS Closing Entry":
         return
         
+    # Ignore SLEs from POS-generated Sales Invoices (since branches natively deduct their own stock)
+    if doc.voucher_type == "Sales Invoice":
+        if frappe.db.get_value("Sales Invoice", doc.voucher_no, "is_pos"):
+            return
+        
     # Log the Delta
     log = frappe.get_doc({
         "doctype": "Cloud Stock Sync Log",
