@@ -1,1 +1,13 @@
-[]
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Purchase Invoice",
+  "enabled": 1,
+  "modified": "2026-08-17 16:05:15.286601",
+  "module": null,
+  "name": "Print Barcode",
+  "script": "frappe.ui.form.on('Purchase Invoice', {\r\n    refresh(frm) {\r\n        if (frm.doc.docstatus === 1) {\r\n            frm.add_custom_button(__('Print Barcode Labels'), function() {\r\n\r\n                const print_format = 'Purchase Invoice Barcode Labels';\r\n\r\n                const url =\r\n                    '/printview?doctype=' +\r\n                    encodeURIComponent(frm.doc.doctype) +\r\n                    '&name=' +\r\n                    encodeURIComponent(frm.doc.name) +\r\n                    '&format=' +\r\n                    encodeURIComponent(print_format) +\r\n                    '&no_letterhead=1';\r\n\r\n                window.open(url, '_blank');\r\n            });\r\n        }\r\n    }\r\n});",
+  "view": "Form"
+ }
+]
