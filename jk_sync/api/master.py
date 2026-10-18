@@ -28,7 +28,7 @@ def get_master_updates():
         "Account", "Warehouse", "UOM", "Brand", "Tax Category", 
         "Item Tax Template", "Sales Taxes and Charges Template",
         "Item Group", "Customer Group", "Territory", "Mode of Payment",
-        "Currency", "Sales Person", "Loyalty Program", "Promotional Scheme", "Pricing Rule",
+        "Currency", "Price List", "Sales Person", "Loyalty Program", "Promotional Scheme", "Pricing Rule",
         "User", "Notification Settings", "Item", "Customer", "Address", "Contact", "Item Price", "POS Profile",
         "Print Format"
     ]
