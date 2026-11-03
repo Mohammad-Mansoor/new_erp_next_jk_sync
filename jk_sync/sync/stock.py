@@ -1,4 +1,36 @@
 import frappe
+from frappe.utils import flt
+
+def get_stock_reconciliation_delta(doc):
+    """
+    Computes the true quantity delta for a Stock Reconciliation SLE.
+    Primary source: Child row (Stock Reconciliation Item).
+    Fallback source: Previous SLE qty_after_transaction.
+    """
+    delta = 0.0
+    if doc.voucher_detail_no and frappe.db.exists("Stock Reconciliation Item", doc.voucher_detail_no):
+        row_data = frappe.db.get_value(
+            "Stock Reconciliation Item",
+            doc.voucher_detail_no,
+            ["qty", "current_qty"],
+            as_dict=True
+        )
+        if row_data:
+            delta = flt(row_data.qty) - flt(row_data.current_qty)
+    else:
+        prev_sle_qty = frappe.db.sql("""
+            select qty_after_transaction from `tabStock Ledger Entry`
+            where item_code = %s and warehouse = %s and is_cancelled = 0 and name != %s
+              and (posting_datetime < %s or (posting_datetime = %s and creation < %s))
+            order by posting_datetime desc, creation desc limit 1
+        """, (doc.item_code, doc.warehouse, doc.name, doc.posting_datetime, doc.posting_datetime, doc.creation))
+        prev_qty = prev_sle_qty[0][0] if prev_sle_qty else 0.0
+        delta = flt(doc.qty_after_transaction) - flt(prev_qty)
+
+    if getattr(doc, "is_cancelled", 0):
+        delta = -1.0 * delta
+
+    return delta
 
 def log_stock_ledger_entry(doc, method):
     """
@@ -39,6 +71,14 @@ def log_stock_ledger_entry(doc, method):
         if frappe.db.get_value("Sales Invoice", doc.voucher_no, "is_pos"):
             return
         
+    # Determine qty_change
+    if doc.voucher_type == "Stock Reconciliation":
+        qty_change = get_stock_reconciliation_delta(doc)
+        if abs(qty_change) < 0.0001:
+            return  # No physical quantity change, skip logging
+    else:
+        qty_change = doc.actual_qty
+
     # Log the Delta
     log = frappe.get_doc({
         "doctype": "Cloud Stock Sync Log",
@@ -46,7 +86,7 @@ def log_stock_ledger_entry(doc, method):
         "item_code": doc.item_code,
         "warehouse": doc.warehouse,
         "company": doc.company,
-        "qty_change": doc.actual_qty,
+        "qty_change": qty_change,
         "reference_doctype": doc.voucher_type,
         "reference_name": doc.voucher_no
     })

@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import flt
 import requests
 import json
 import time
@@ -221,9 +222,16 @@ def process_master_updates(data):
                 frappe.db.commit()
                 continue
                 
+            qty_change = flt(delta.get("qty_change", 0))
+            if abs(qty_change) < 0.0001:
+                frappe.db.sql("UPDATE `tabLocal Stock Sync Log` SET status = 'PROCESSED' WHERE stock_delta_id = %s AND claim_token = %s", (stock_delta_id, claim_token))
+                frappe.db.commit()
+                ack_stock_delta(stock_delta_id)
+                continue
+
             try:
                 frappe.db.savepoint("stock_delta")
-                purpose = "Material Receipt" if delta["qty_change"] > 0 else "Material Issue"
+                purpose = "Material Receipt" if qty_change > 0 else "Material Issue"
                 ste = frappe.get_doc({
                     "doctype": "Stock Entry",
                     "company": delta.get("company") or frappe.db.get_value("Warehouse", delta["warehouse"], "company"),
@@ -231,9 +239,9 @@ def process_master_updates(data):
                     "purpose": purpose,
                     "items": [{
                         "item_code": delta["item_code"],
-                        "t_warehouse": delta["warehouse"] if delta["qty_change"] > 0 else None,
-                        "s_warehouse": delta["warehouse"] if delta["qty_change"] < 0 else None,
-                        "qty": abs(delta["qty_change"]),
+                        "t_warehouse": delta["warehouse"] if qty_change > 0 else None,
+                        "s_warehouse": delta["warehouse"] if qty_change < 0 else None,
+                        "qty": abs(qty_change),
                         "basic_rate": 0,
                         "allow_zero_valuation_rate": 1
                     }]
